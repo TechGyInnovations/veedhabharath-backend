@@ -1,0 +1,25 @@
+{
+  "name": "veda-bharath-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechGyInnovations/veedhabharath-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "latest",
+    "dotenv": "latest",
+    "express": "latest",
+    "axios": "latest",
+    "nodemon": "latest",
+    "serverless-http": "latest"
+  }
+}
