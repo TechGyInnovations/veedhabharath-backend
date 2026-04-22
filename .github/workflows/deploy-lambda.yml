@@ -1,0 +1,113 @@
+name: Deploy Lambda
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  
+on:
+  push:
+    branches:
+      - development
+      - qa
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # This automatically maps to GitHub Environments 'development' and 'qa'
+    # allowing you to define the same secret names (LAMBDA_FUNCTION_NAME) with different values per environment.
+    environment: ${{ github.ref_name }}
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Setup Node.js 24
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # 3. Install dependencies (creates node_modules)
+      - name: Install dependencies
+        run: npm install
+
+      # 4. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 5. Create deployment package (INCLUDING node_modules)
+      - name: Create zip package
+        run: |
+          zip -r function.zip . \
+            -x "*.git*" \
+            -x ".github/*"
+
+      # 6. Upload zip to S3
+      - name: Upload to S3
+        run: |
+          aws s3 cp function.zip s3://aws-backend-deployment-bucket/glc-agent/${{ github.ref_name }}/function.zip
+
+      # 7. Deploy Lambda code from S3
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --s3-bucket aws-backend-deployment-bucket \
+            --s3-key function.zip
+
+      # 8. Install jq (for safe JSON handling)
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      # Waiting for lambda update to complete
+      - name: Wait for Lambda update to complete
+        run: |
+          echo "Waiting for Lambda update to finish..."
+
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }}
+
+          echo "Lambda update completed."
+
+      # 9. Generate env.json from .env
+      - name: Update Lambda environment variables from .env
+        run: |
+          if [ ! -f .env ]; then
+            echo ".env file not found. Skipping environment update."
+            exit 0
+          fi
+
+          node <<EOF
+          const fs = require('fs');
+
+          const env = Object.fromEntries(
+            fs.readFileSync('.env', 'utf8')
+              .split('\n')
+              .filter(line => line.trim() && !line.startsWith('#'))
+              .map(line => {
+                const index = line.indexOf('=');
+                return [
+                  line.slice(0, index).trim(),
+                  line.slice(index + 1).trim()
+                ];
+              })
+          );
+
+          fs.writeFileSync(
+            'env.json',
+            JSON.stringify({ Variables: env })
+          );
+          EOF
+
+          echo "Generated env.json:"
+          cat env.json
+
+          aws lambda update-function-configuration \
+            --function-name "${{ secrets.LAMBDA_FUNCTION_NAME }}" \
+            --environment file://env.json
+
+          rm -f function.zip env.json
