@@ -20,6 +20,7 @@
     "express": "latest",
     "axios": "latest",
     "nodemon": "latest",
-    "serverless-http": "latest"
+    "serverless-http": "latest",
+    "jose": "latest"
   }
 }
