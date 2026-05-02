@@ -49,7 +49,7 @@ jobs:
       # 6. Upload zip to S3
       - name: Upload to S3
         run: |
-          aws s3 cp function.zip s3://aws-backend-deployment-bucket/glc-agent/${{ github.ref_name }}/function.zip
+          aws s3 cp function.zip s3://aws-backend-deployment-bucket/vedabharath/${{ github.ref_name }}/function.zip
 
       # 7. Deploy Lambda code from S3
       - name: Update Lambda function code
@@ -57,7 +57,7 @@ jobs:
           aws lambda update-function-code \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
             --s3-bucket aws-backend-deployment-bucket \
-            --s3-key function.zip
+            --s3-key vedabharath/${{ github.ref_name }}/function.zip
 
       # 8. Install jq (for safe JSON handling)
       - name: Install jq
